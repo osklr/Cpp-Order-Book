@@ -10,7 +10,9 @@ OrderBook::OrderId OrderBook::create_order(OrderType type, Price p, Quantity q) 
             search_book[current_id] = --current_list.end();
         }
         else {
-            
+            while (p >= ask_book.begin()->first && q >= ask_book.begin()->second.begin()->get_quantity()) {
+                
+            }
         }
     }
     else {
