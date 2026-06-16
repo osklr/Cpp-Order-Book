@@ -25,4 +25,7 @@ class OrderBook {
         OrderId create_order(OrderType type, Price p, Quantity q);
         void cancel_order(OrderId id);
         void modify_order(OrderId id);
+        Price get_best_bid() const;
+        Price get_best_ask() const;
+        Price get_spread() const;
 };
