@@ -9,15 +9,15 @@ enum class OrderSide {
 enum class OrderType {
     Limit,
     Market,
-    Stop,
-    StopLimit
+    Stop, // Deferred
+    StopLimit // Deferred
 };
 
 enum class TimeInForce {
-    GFD, // Good For Day
-    GTC, // Good Till Cancelled
-    IOC, // Immediate Or Cancel
-    FOK  // Fill Or Kill
+    GFD, // Good For Day (Deferred)
+    GTC, // Good Till Cancelled 
+    IOC, // Immediate Or Cancel (Deferred)
+    FOK  // Fill Or Kill (Deferred)
 };
 
 enum class Status : uint8_t {

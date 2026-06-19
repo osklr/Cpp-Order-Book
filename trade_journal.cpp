@@ -19,3 +19,11 @@ Trade TradeJournal::search_trade(TradeId id) const {
     }
     throw std::out_of_range("No trade is found.");
 }
+
+Trade::Time TradeJournal::get_trade_completed_time(TradeId id) const {
+    try {
+        Trade current_trade = search_trade(id);
+        return current_trade.get_timestamp();
+    }
+    catch (const std::out_of_range& e) {}
+}

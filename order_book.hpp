@@ -4,12 +4,21 @@
 #include <unordered_map>
 #include <functional>
 #include "order_journal.hpp"
+#include "trade_journal.hpp"
+
+enum class ModifyType {
+    SetStatus,
+    SetCompletedTime,
+    SetCanceledTime,
+    AddFilledQuantity
+};
 
 class OrderBook {
     public:
         using Price = Order::Price;
         using OrderId = Order::OrderId;
         using Quantity = Order::Quantity;
+        using Time = Trade::Time;
 
     private:
         // Order ID counter
@@ -22,17 +31,49 @@ class OrderBook {
         std::map<Price, std::list<Order>> ask_book;
         std::unordered_map<OrderId, std::list<Order>::iterator> order_book_search_map;
 
-    public:
-        OrderBook();
+        OrderJournal order_journal;
+        TradeJournal trade_journal;
 
+    public:
+        OrderBook() = default;
+        
+        // Get Functions
         Price get_best_bid() const;
         Price get_best_ask() const;
         Price get_spread() const;
+        std::list<Order>& get_list_with_price_level(Price p, OrderSide s);
 
-        OrderId create_order(OrderSide side, OrderType type, TimeInForce t_in_force, Price p, Quantity q);
-        void place_order(OrderId id);
+        // Main Functions
+        Order create_order(OrderSide side, OrderType type, TimeInForce t_in_force, Price p, Quantity q);
+        void place_order(Order& order);
         void cancel_order(OrderId id);
-        void modify_order(OrderId id, OrderSide side, OrderType type, TimeInForce t_in_force, Price p, Quantity q);
         void match_order(Order order);
-        Order search_order_book(OrderId id) const;
+
+        void submit_order(OrderSide side, OrderType type, TimeInForce t_in_force, Price p, Quantity q);
+        const Order search_order_book(OrderId id) const;
+
+        // Set Functions
+        void set_order_status(OrderId id, Status s);
+        void set_order_completed_time(OrderId id, Time t);
+        void set_order_canceled_time(OrderId id, Time t);
+        void add_order_filled_quantity(OrderId id, Quantity q);
+
+        // Remove Functions
+        // For this function, make sure current_iterator won't be used again as the iterator is erased
+        template <typename Book>
+        void remove_list_if_no_order(Book& book, typename Book::iterator current_iterator) {
+            if (current_iterator != book.end() && current_iterator->second.empty()) {
+                book.erase(current_iterator);
+            }
+        }
+
+        void remove_record_from_order_book_search_map(OrderId id);
+        void remove_order_from_order_book(OrderId id);
+
+        // Matching Functions
+        void match_buy_order(Order& order);
+        void match_sell_order(Order& order);
+        void handle_stop_order(Order& order);
+        void finalize_filled_order(Order& order);
+        void finalize_canceled_order(Order& order);
 };
