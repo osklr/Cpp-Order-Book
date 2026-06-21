@@ -53,10 +53,10 @@ class OrderBook {
         const Order search_order_book(OrderId id) const;
 
         // Set Functions
-        void set_order_status(OrderId id, Status s);
-        void set_order_completed_time(OrderId id, Time t);
-        void set_order_canceled_time(OrderId id, Time t);
-        void add_order_filled_quantity(OrderId id, Quantity q);
+        void set_order_status_from_order_book(OrderId id, Status s);
+        void set_order_completed_time_from_order_book(OrderId id, Time t);
+        void set_order_canceled_time_from_order_book(OrderId id, Time t);
+        void add_order_filled_quantity_from_order_book(OrderId id, Quantity q);
 
         // Remove Functions
         // For this function, make sure current_iterator won't be used again as the iterator is erased

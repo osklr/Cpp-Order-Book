@@ -133,7 +133,7 @@ void OrderBook::submit_order(OrderSide side, OrderType type, TimeInForce t_in_fo
     match_order(current_order);
 }
 
-void OrderBook::set_order_status(OrderId id, Status s) {
+void OrderBook::set_order_status_from_order_book(OrderId id, Status s) {
     std::unordered_map<OrderId, std::list<Order>::iterator>::iterator current_iterator = order_book_search_map.find(id);
     if (current_iterator == order_book_search_map.end()) {
         return;
@@ -143,7 +143,7 @@ void OrderBook::set_order_status(OrderId id, Status s) {
     order_journal.set_status_in_order_journal(id, s);
 }
 
-void OrderBook::set_order_completed_time(OrderId id, Time t) {
+void OrderBook::set_order_completed_time_from_order_book(OrderId id, Time t) {
     std::unordered_map<OrderId, std::list<Order>::iterator>::iterator current_iterator = order_book_search_map.find(id);
     if (current_iterator == order_book_search_map.end()) {
         return;
@@ -153,7 +153,7 @@ void OrderBook::set_order_completed_time(OrderId id, Time t) {
     order_journal.set_completed_time_in_order_journal(id, t);
 }
 
-void OrderBook::set_order_canceled_time(OrderId id, Time t) {
+void OrderBook::set_order_canceled_time_from_order_book(OrderId id, Time t) {
     std::unordered_map<OrderId, std::list<Order>::iterator>::iterator current_iterator = order_book_search_map.find(id);
     if (current_iterator == order_book_search_map.end()) {
         return;
@@ -163,7 +163,7 @@ void OrderBook::set_order_canceled_time(OrderId id, Time t) {
     order_journal.set_canceled_time_in_order_journal(id, t);
 }
 
-void OrderBook::add_order_filled_quantity(OrderId id, Quantity q) {
+void OrderBook::add_order_filled_quantity_from_order_book(OrderId id, Quantity q) {
     std::unordered_map<OrderId, std::list<Order>::iterator>::iterator current_iterator = order_book_search_map.find(id);
     if (current_iterator == order_book_search_map.end()) {
         return;
@@ -211,19 +211,23 @@ void OrderBook::match_buy_order(Order& order) {
                 Trade::TradeId current_trade_id = trade_journal.create_trade(current_order.get_order_id(), order.get_order_id(), current_price, trade_quantity);
                 Time current_completed_time = trade_journal.get_trade_completed_time(current_trade_id);
                 // Set completed time in both order book and order journal for maker order
-                current_order.set_completed_time(current_completed_time);
-                // Add filled quantity in both order book and order journal for both orders
-                current_order.add_filled_quantity(trade_quantity);
-                order.add_filled_quantity(trade_quantity);
+                OrderId maker_order_id = current_order.get_order_id();
+                set_order_completed_time_from_order_book(maker_order_id, current_completed_time);
+                // Set status for the maker order
+                set_order_status_from_order_book(maker_order_id, Status::Filled);
+                // Add filled quantity for both orders
+                add_order_filled_quantity_from_order_book(maker_order_id, trade_quantity);
+                OrderId taker_order_id = order.get_order_id();
+                order_journal.add_filled_quantity_in_order_journal(taker_order_id, trade_quantity);
                 // Subtract the remaining quantity for the taker order
                 remaining_quantity -= trade_quantity;
                 // Check if all quantity is filled for the taker order. If yes, set its status as Filled and set completed time. If not, set status as partially filled.
                 if (remaining_quantity == 0 && order.get_quantity() == order.get_filled_quantity()) {
-                    order.set_status(Status::Filled);
-                    order.set_completed_time(current_completed_time);
+                    order_journal.set_status_in_order_journal(taker_order_id, Status::Filled);
+                    order_journal.set_completed_time_in_order_journal(taker_order_id, current_completed_time);
                 }
                 else {
-                    order.set_status(Status::PartiallyFilled);
+                    order_journal.set_status_in_order_journal(taker_order_id, Status::PartiallyFilled);
                 }
                 // Remove the maker order from the order book
                 current_list.pop_front();
@@ -241,15 +245,18 @@ void OrderBook::match_buy_order(Order& order) {
                 // Create a new trade record in the trade journal
                 Trade::TradeId current_trade_id = trade_journal.create_trade(current_order.get_order_id(), order.get_order_id(), current_price, trade_quantity);
                 Time current_completed_time = trade_journal.get_trade_completed_time(current_trade_id);
-                // Set completed time in both order book and order journal for taker order
-                order.set_completed_time(current_completed_time);
-                // Add filled quantity in both order book and order journal for both orders
-                current_order.add_filled_quantity(trade_quantity);
-                order.add_filled_quantity(trade_quantity);
+                // Set completed time in order journal for taker order
+                OrderId taker_order_id = order.get_order_id();
+                order_journal.set_completed_time_in_order_journal(taker_order_id, current_completed_time);
+                // Add filled quantity for both orders
+                OrderId maker_order_id = current_order.get_order_id();
+                add_order_filled_quantity_from_order_book(maker_order_id, trade_quantity);
+                order_journal.add_filled_quantity_in_order_journal(taker_order_id, trade_quantity);
                 // Subtract the remaining quantity for the taker order
                 remaining_quantity -= trade_quantity;
-                // Taker order is completely filled, set status to filled
-                order.set_status(Status::Filled);
+                // Taker order is completely filled, set status to filled. Maker order set to partially filled
+                set_order_status_from_order_book(maker_order_id, Status::PartiallyFilled);
+                order_journal.set_status_in_order_journal(taker_order_id, Status::Filled);
                 return;
             }
             if (remaining_quantity > 0) {
@@ -283,19 +290,23 @@ void OrderBook::match_sell_order(Order& order) {
                 Trade::TradeId current_trade_id = trade_journal.create_trade(current_order.get_order_id(), order.get_order_id(), current_price, trade_quantity);
                 Time current_completed_time = trade_journal.get_trade_completed_time(current_trade_id);
                 // Set completed time in both order book and order journal for maker order
-                current_order.set_completed_time(current_completed_time);
-                // Add filled quantity in both order book and order journal for both orders
-                current_order.add_filled_quantity(trade_quantity);
-                order.add_filled_quantity(trade_quantity);
+                OrderId maker_order_id = current_order.get_order_id();
+                set_order_completed_time_from_order_book(maker_order_id, current_completed_time);
+                // Set status for the maker order
+                set_order_status_from_order_book(maker_order_id, Status::Filled);
+                // Add filled quantity for both orders
+                add_order_filled_quantity_from_order_book(maker_order_id, trade_quantity);
+                OrderId taker_order_id = order.get_order_id();
+                order_journal.add_filled_quantity_in_order_journal(taker_order_id, trade_quantity);
                 // Subtract the remaining quantity for the taker order
                 remaining_quantity -= trade_quantity;
                 // Check if all quantity is filled for the taker order. If yes, set its status as Filled and set completed time. If not, set status as partially filled.
                 if (remaining_quantity == 0 && order.get_quantity() == order.get_filled_quantity()) {
-                    order.set_status(Status::Filled);
-                    order.set_completed_time(current_completed_time);
+                    order_journal.set_status_in_order_journal(taker_order_id, Status::Filled);
+                    order_journal.set_completed_time_in_order_journal(taker_order_id, current_completed_time);
                 }
                 else {
-                    order.set_status(Status::PartiallyFilled);
+                    order_journal.set_status_in_order_journal(taker_order_id, Status::PartiallyFilled);
                 }
                 // Remove the maker order from the order book
                 current_list.pop_front();
@@ -313,15 +324,18 @@ void OrderBook::match_sell_order(Order& order) {
                 // Create a new trade record in the trade journal
                 Trade::TradeId current_trade_id = trade_journal.create_trade(current_order.get_order_id(), order.get_order_id(), current_price, trade_quantity);
                 Time current_completed_time = trade_journal.get_trade_completed_time(current_trade_id);
-                // Set completed time in both order book and order journal for taker order
-                order.set_completed_time(current_completed_time);
-                // Add filled quantity in both order book and order journal for both orders
-                current_order.add_filled_quantity(trade_quantity);
-                order.add_filled_quantity(trade_quantity);
+                // Set completed time in order journal for taker order
+                OrderId taker_order_id = order.get_order_id();
+                order_journal.set_completed_time_in_order_journal(taker_order_id, current_completed_time);
+                // Add filled quantity for both orders
+                OrderId maker_order_id = current_order.get_order_id();
+                add_order_filled_quantity_from_order_book(maker_order_id, trade_quantity);
+                order_journal.add_filled_quantity_in_order_journal(taker_order_id, trade_quantity);
                 // Subtract the remaining quantity for the taker order
                 remaining_quantity -= trade_quantity;
-                // Taker order is completely filled, set status to filled
-                order.set_status(Status::Filled);
+                // Taker order is completely filled, set status to filled. Maker order set to partially filled
+                set_order_status_from_order_book(maker_order_id, Status::PartiallyFilled);
+                order_journal.set_status_in_order_journal(taker_order_id, Status::Filled);
                 return;
             }
             if (remaining_quantity > 0) {
