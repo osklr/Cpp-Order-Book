@@ -1,5 +1,6 @@
 #include "order_book.hpp"
 #include <chrono>
+#include <stdexcept>
 
 OrderBook::Price OrderBook::get_best_bid() const {
     if (bid_book.empty()) {
@@ -111,6 +112,10 @@ const Order OrderBook::search_order_book(OrderId id) const {
     return *(current_iterator->second);
 }
 
+const Order search_order_in_order_journal(OrderId id) const {
+    return order_journal.search_order_record(id);
+}
+
 void OrderBook::match_order(Order order) {
     // Determine its order type
     if (order.get_order_type() == OrderType::Stop || order.get_order_type() == OrderType::StopLimit) {
@@ -163,14 +168,14 @@ void OrderBook::set_order_canceled_time_from_order_book(OrderId id, Time t) {
     order_journal.set_canceled_time_in_order_journal(id, t);
 }
 
-void OrderBook::add_order_filled_quantity_from_order_book(OrderId id, Quantity q) {
+void OrderBook::subtract_order_remaining_quantity_from_order_book(OrderId id, Quantity q) {
     std::unordered_map<OrderId, std::list<Order>::iterator>::iterator current_iterator = order_book_search_map.find(id);
     if (current_iterator == order_book_search_map.end()) {
         return;
     }
     std::list<Order>::iterator current_order_iterator = current_iterator->second;
-    current_order_iterator->add_filled_quantity(q);
-    order_journal.add_filled_quantity_in_order_journal(id, q);
+    current_order_iterator->subtract_remaining_quantity(q);
+    order_journal.subtract_remaining_quantity_in_order_journal(id, q);
 }
 
 void OrderBook::remove_record_from_order_book_search_map(OrderId id) {
@@ -200,12 +205,11 @@ void OrderBook::match_buy_order(Order& order) {
         else {
             /* While the price of order is higher or equal to the best ask and the quantity of the order is larger 
             than the quantity of the first order in the queue at the best ask, continue to fill the order. */
-            Quantity remaining_quantity = order.get_quantity();
-            while (!ask_book.empty() && order.get_price() >= ask_book.begin()->first && remaining_quantity >= ask_book.begin()->second.begin()->get_quantity()) {
+            while (!ask_book.empty() && order.get_price() >= ask_book.begin()->first && order.get_remaining_quantity() >= ask_book.begin()->second.begin()->get_remaining_quantity()) {
                 std::map<Price, std::list<Order>>::iterator current_iterator = ask_book.begin();
                 std::list<Order>& current_list = current_iterator->second;
                 Order& current_order = current_list.front();
-                Quantity trade_quantity = current_order.get_quantity();
+                Quantity trade_quantity = current_order.get_remaining_quantity();
                 Price current_price = current_iterator->first;
                 // Create a new trade record in the trade journal
                 Trade::TradeId current_trade_id = trade_journal.create_trade(current_order.get_order_id(), order.get_order_id(), current_price, trade_quantity);
@@ -215,18 +219,20 @@ void OrderBook::match_buy_order(Order& order) {
                 set_order_completed_time_from_order_book(maker_order_id, current_completed_time);
                 // Set status for the maker order
                 set_order_status_from_order_book(maker_order_id, Status::Filled);
-                // Add filled quantity for both orders
-                add_order_filled_quantity_from_order_book(maker_order_id, trade_quantity);
+                // Subtract remaining quantity for both orders
+                subtract_order_remaining_quantity_from_order_book(maker_order_id, trade_quantity);
                 OrderId taker_order_id = order.get_order_id();
-                order_journal.add_filled_quantity_in_order_journal(taker_order_id, trade_quantity);
-                // Subtract the remaining quantity for the taker order
-                remaining_quantity -= trade_quantity;
+                order.subtract_remaining_quantity(trade_quantity);
+                order_journal.subtract_remaining_quantity_in_order_journal(taker_order_id, trade_quantity);
                 // Check if all quantity is filled for the taker order. If yes, set its status as Filled and set completed time. If not, set status as partially filled.
-                if (remaining_quantity == 0 && order.get_quantity() == order.get_filled_quantity()) {
+                if (order.get_remaining_quantity() == 0) {
+                    order.set_status(Status::Filled);
                     order_journal.set_status_in_order_journal(taker_order_id, Status::Filled);
+                    order.set_completed_time(current_completed_time);
                     order_journal.set_completed_time_in_order_journal(taker_order_id, current_completed_time);
                 }
                 else {
+                    order.set_status(Status::PartiallyFilled);
                     order_journal.set_status_in_order_journal(taker_order_id, Status::PartiallyFilled);
                 }
                 // Remove the maker order from the order book
@@ -236,30 +242,31 @@ void OrderBook::match_buy_order(Order& order) {
                 // Remove the list at the trade price from the ask book if no order left at that price
                 remove_list_if_no_order(ask_book, current_iterator);
             }
-            if (!ask_book.empty() && order.get_price() >= ask_book.begin()->first && remaining_quantity < ask_book.begin()->second.begin()->get_quantity()) {
+            if (!ask_book.empty() && order.get_price() >= ask_book.begin()->first && order.get_remaining_quantity() > 0 && order.get_remaining_quantity() < ask_book.begin()->second.begin()->get_remaining_quantity()) {
                 // Fill the remaining quantity of the taker order
                 std::map<Price, std::list<Order>>::iterator current_iterator = ask_book.begin();
                 Order& current_order = current_iterator->second.front();
-                Quantity trade_quantity = remaining_quantity;
+                Quantity trade_quantity = order.get_remaining_quantity();
                 Price current_price = current_iterator->first;
                 // Create a new trade record in the trade journal
                 Trade::TradeId current_trade_id = trade_journal.create_trade(current_order.get_order_id(), order.get_order_id(), current_price, trade_quantity);
                 Time current_completed_time = trade_journal.get_trade_completed_time(current_trade_id);
                 // Set completed time in order journal for taker order
                 OrderId taker_order_id = order.get_order_id();
+                order.set_completed_time(current_completed_time);
                 order_journal.set_completed_time_in_order_journal(taker_order_id, current_completed_time);
-                // Add filled quantity for both orders
+                // Subtract remaining quantity for both orders
                 OrderId maker_order_id = current_order.get_order_id();
-                add_order_filled_quantity_from_order_book(maker_order_id, trade_quantity);
-                order_journal.add_filled_quantity_in_order_journal(taker_order_id, trade_quantity);
-                // Subtract the remaining quantity for the taker order
-                remaining_quantity -= trade_quantity;
+                subtract_order_remaining_quantity_from_order_book(maker_order_id, trade_quantity);
+                order.subtract_remaining_quantity(trade_quantity);
+                order_journal.subtract_remaining_quantity_in_order_journal(taker_order_id, trade_quantity);
                 // Taker order is completely filled, set status to filled. Maker order set to partially filled
                 set_order_status_from_order_book(maker_order_id, Status::PartiallyFilled);
+                order.set_status(Status::Filled);
                 order_journal.set_status_in_order_journal(taker_order_id, Status::Filled);
                 return;
             }
-            if (remaining_quantity > 0) {
+            if (order.get_remaining_quantity() > 0) {
                 place_order(order);
             }
         }
@@ -279,12 +286,11 @@ void OrderBook::match_sell_order(Order& order) {
         else {
             /* While the price of order is lower or equal to the best bid and the quantity of the order is larger 
             than the quantity of the first order in the queue at the best bid, continue to fill the order. */
-            Quantity remaining_quantity = order.get_quantity();
-            while (!bid_book.empty() && order.get_price() <= bid_book.begin()->first && remaining_quantity >= bid_book.begin()->second.begin()->get_quantity()) {
+            while (!bid_book.empty() && order.get_price() <= bid_book.begin()->first && order.get_remaining_quantity() >= bid_book.begin()->second.begin()->get_remaining_quantity()) {
                 std::map<Price, std::list<Order>, std::greater<Price>>::iterator current_iterator = bid_book.begin();
                 std::list<Order>& current_list = current_iterator->second;
                 Order& current_order = current_list.front();
-                Quantity trade_quantity = current_order.get_quantity();
+                Quantity trade_quantity = current_order.get_remaining_quantity();
                 Price current_price = current_iterator->first;
                 // Create a new trade record in the trade journal
                 Trade::TradeId current_trade_id = trade_journal.create_trade(current_order.get_order_id(), order.get_order_id(), current_price, trade_quantity);
@@ -294,18 +300,20 @@ void OrderBook::match_sell_order(Order& order) {
                 set_order_completed_time_from_order_book(maker_order_id, current_completed_time);
                 // Set status for the maker order
                 set_order_status_from_order_book(maker_order_id, Status::Filled);
-                // Add filled quantity for both orders
-                add_order_filled_quantity_from_order_book(maker_order_id, trade_quantity);
+                // Subtract remaining quantity for both orders
+                subtract_order_remaining_quantity_from_order_book(maker_order_id, trade_quantity);
                 OrderId taker_order_id = order.get_order_id();
-                order_journal.add_filled_quantity_in_order_journal(taker_order_id, trade_quantity);
-                // Subtract the remaining quantity for the taker order
-                remaining_quantity -= trade_quantity;
+                order.subtract_remaining_quantity(trade_quantity);
+                order_journal.subtract_remaining_quantity_in_order_journal(taker_order_id, trade_quantity);
                 // Check if all quantity is filled for the taker order. If yes, set its status as Filled and set completed time. If not, set status as partially filled.
-                if (remaining_quantity == 0 && order.get_quantity() == order.get_filled_quantity()) {
+                if (order.get_remaining_quantity() == 0) {
+                    order.set_status(Status::Filled);
                     order_journal.set_status_in_order_journal(taker_order_id, Status::Filled);
+                    order.set_completed_time(current_completed_time);
                     order_journal.set_completed_time_in_order_journal(taker_order_id, current_completed_time);
                 }
                 else {
+                    order.set_status(Status::PartiallyFilled);
                     order_journal.set_status_in_order_journal(taker_order_id, Status::PartiallyFilled);
                 }
                 // Remove the maker order from the order book
@@ -315,30 +323,31 @@ void OrderBook::match_sell_order(Order& order) {
                 // Remove the list at the trade price from the bid book if no order left at that price
                 remove_list_if_no_order(bid_book, current_iterator);
             }
-            if (!bid_book.empty() && order.get_price() <= bid_book.begin()->first && remaining_quantity < bid_book.begin()->second.begin()->get_quantity()) {
+            if (!bid_book.empty() && order.get_price() <= bid_book.begin()->first && order.get_remaining_quantity() > 0 && order.get_remaining_quantity() < bid_book.begin()->second.begin()->get_remaining_quantity()) {
                 // Fill the remaining quantity of the taker order
                 std::map<Price, std::list<Order>, std::greater<Price>>::iterator current_iterator = bid_book.begin();
                 Order& current_order = current_iterator->second.front();
-                Quantity trade_quantity = remaining_quantity;
+                Quantity trade_quantity = order.get_remaining_quantity();
                 Price current_price = current_iterator->first;
                 // Create a new trade record in the trade journal
                 Trade::TradeId current_trade_id = trade_journal.create_trade(current_order.get_order_id(), order.get_order_id(), current_price, trade_quantity);
                 Time current_completed_time = trade_journal.get_trade_completed_time(current_trade_id);
                 // Set completed time in order journal for taker order
                 OrderId taker_order_id = order.get_order_id();
+                order.set_completed_time(current_completed_time);
                 order_journal.set_completed_time_in_order_journal(taker_order_id, current_completed_time);
-                // Add filled quantity for both orders
+                // Subtract remaining quantity for both orders
                 OrderId maker_order_id = current_order.get_order_id();
-                add_order_filled_quantity_from_order_book(maker_order_id, trade_quantity);
-                order_journal.add_filled_quantity_in_order_journal(taker_order_id, trade_quantity);
-                // Subtract the remaining quantity for the taker order
-                remaining_quantity -= trade_quantity;
+                subtract_order_remaining_quantity_from_order_book(maker_order_id, trade_quantity);
+                order.subtract_remaining_quantity(trade_quantity);
+                order_journal.subtract_remaining_quantity_in_order_journal(taker_order_id, trade_quantity);
                 // Taker order is completely filled, set status to filled. Maker order set to partially filled
                 set_order_status_from_order_book(maker_order_id, Status::PartiallyFilled);
+                order.set_status(Status::Filled);
                 order_journal.set_status_in_order_journal(taker_order_id, Status::Filled);
                 return;
             }
-            if (remaining_quantity > 0) {
+            if (order.get_remaining_quantity() > 0) {
                 place_order(order);
             }
         }

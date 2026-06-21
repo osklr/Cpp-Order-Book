@@ -6,13 +6,6 @@
 #include "order_journal.hpp"
 #include "trade_journal.hpp"
 
-enum class ModifyType {
-    SetStatus,
-    SetCompletedTime,
-    SetCanceledTime,
-    AddFilledQuantity
-};
-
 class OrderBook {
     public:
         using Price = Order::Price;
@@ -51,12 +44,13 @@ class OrderBook {
 
         void submit_order(OrderSide side, OrderType type, TimeInForce t_in_force, Price p, Quantity q);
         const Order search_order_book(OrderId id) const;
+        const Order search_order_in_order_journal(OrderId id) const;
 
         // Set Functions
         void set_order_status_from_order_book(OrderId id, Status s);
         void set_order_completed_time_from_order_book(OrderId id, Time t);
         void set_order_canceled_time_from_order_book(OrderId id, Time t);
-        void add_order_filled_quantity_from_order_book(OrderId id, Quantity q);
+        void subtract_order_remaining_quantity_from_order_book(OrderId id, Quantity q);
 
         // Remove Functions
         // For this function, make sure current_iterator won't be used again as the iterator is erased
@@ -76,4 +70,9 @@ class OrderBook {
         void handle_stop_order(Order& order);
         void finalize_filled_order(Order& order);
         void finalize_canceled_order(Order& order);
+
+        // Print Functions
+        void print_book() {
+            std::cout << ""
+        }
 };

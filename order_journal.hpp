@@ -24,5 +24,5 @@ class OrderJournal {
         void set_canceled_time_in_order_journal(OrderId id, Time canceled_t);
         void set_completed_time_in_order_journal(OrderId id, Time completed_t);
         void set_status_in_order_journal(OrderId id, Status s);
-        void add_filled_quantity_in_order_journal(OrderId id, Quantity q);
+        void subtract_remaining_quantity_in_order_journal(OrderId id, Quantity q);
 };

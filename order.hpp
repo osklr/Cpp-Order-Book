@@ -8,7 +8,7 @@ enum class OrderSide {
 
 enum class OrderType {
     Limit,
-    Market,
+    Market, // Deferred
     Stop, // Deferred
     StopLimit // Deferred
 };
@@ -42,7 +42,7 @@ class Order {
         TimeInForce time_in_force;
         Price price;
         Quantity quantity;
-        Quantity filled_quantity;
+        Quantity remaining_quantity;
         Status status;
         Time created_time;
         Time completed_time;
@@ -65,7 +65,7 @@ class Order {
             , time_in_force(t_in_force)
             , price(p)
             , quantity(q)
-            , filled_quantity(0)
+            , remaining_quantity(q)
             , status(Status::New)
             , created_time(created_t)
             , completed_time(0)
@@ -79,7 +79,7 @@ class Order {
         TimeInForce get_time_in_force() const { return time_in_force; }
         Price get_price() const { return price; }
         Quantity get_quantity() const { return quantity; }
-        Quantity get_filled_quantity() const { return filled_quantity; }
+        Quantity get_remaining_quantity() const { return remaining_quantity; }
         Status get_status() const { return status; }
         Time get_created_time() const { return created_time; }
         Time get_completed_time() const { return completed_time; }
@@ -89,5 +89,5 @@ class Order {
         void set_status(Status s) { status = s; }
         void set_completed_time(Time t) { completed_time = t; }
         void set_canceled_time(Time t) { canceled_time = t; }
-        void add_filled_quantity(Quantity q) { filled_quantity += q; }
+        void subtract_remaining_quantity(Quantity q) { remaining_quantity -= q; }
 };

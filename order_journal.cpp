@@ -1,4 +1,5 @@
 #include "order_journal.hpp"
+#include <stdexcept>
 
 // Create the record and put it into the order journal and the order search book
 void OrderJournal::create_order_record(OrderId id, OrderSide side, OrderType type, TimeInForce t_in_force, Price p, Quantity q, Time current_t) {
@@ -39,11 +40,11 @@ void OrderJournal::set_status_in_order_journal(OrderId id, Status s) {
     order_journal[current_iterator->second].set_status(s);
 }
 
-void OrderJournal::add_filled_quantity_in_order_journal(OrderId id, Quantity q) {
+void OrderJournal::subtract_remaining_quantity_in_order_journal(OrderId id, Quantity q) {
     std::unordered_map<OrderId, VectorIndex>::const_iterator current_iterator = order_journal_search_book.find(id);
     if (current_iterator == order_journal_search_book.end()) {
         throw std::out_of_range("The order record is not found.");
     }
-    order_journal[current_iterator->second].add_filled_quantity(q);
+    order_journal[current_iterator->second].subtract_remaining_quantity(q);
 }
         
