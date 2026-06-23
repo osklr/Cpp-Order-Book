@@ -15,7 +15,7 @@ enum class OrderType {
 
 enum class TimeInForce {
     GFD, // Good For Day (Deferred)
-    GTC, // Good Till Cancelled 
+    GTC, // Good Till Canceled 
     IOC, // Immediate Or Cancel (Deferred)
     FOK  // Fill Or Kill (Deferred)
 };

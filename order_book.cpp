@@ -1,6 +1,9 @@
 #include "order_book.hpp"
 #include <chrono>
 #include <stdexcept>
+#include <iostream>
+#include <limits>
+#include <string>
 
 OrderBook::Price OrderBook::get_best_bid() const {
     if (bid_book.empty()) {
@@ -112,7 +115,7 @@ const Order OrderBook::search_order_book(OrderId id) const {
     return *(current_iterator->second);
 }
 
-const Order search_order_in_order_journal(OrderId id) const {
+const Order OrderBook::search_order_in_order_journal(OrderId id) const {
     return order_journal.search_order_record(id);
 }
 
@@ -369,4 +372,268 @@ void OrderBook::finalize_canceled_order(Order& order) {
     return; // Deferred
 }
 
+void OrderBook::print_book() const {
+    std::cout << "======= Order Book =======\n";
+    std::cout << "Asks:\n";
+    if (ask_book.empty()) {
+        std::cout << "No available sell order.\n";
+    }
+    else {
+        std::cout << "Price | Quantity\n";
+        for (const auto& [price, list] : ask_book) {
+            Quantity current_quantity = 0;
+            for (const Order& o : list) {
+                current_quantity += o.get_remaining_quantity();
+            }
+            std::cout << price << " | " << current_quantity << "\n";
+        }
+    }
+    std::cout << "========\n";
+    std::cout << "Spread: " << get_spread() << "\n";
+    std::cout << "========\n";
+    std::cout << "Bids:\n";
+    if (bid_book.empty()) {
+        std::cout << "No available buy order.\n";
+    }
+    else {
+        std::cout << "Price | Quantity\n";
+        for (const auto& [price, list] : bid_book) {
+            Quantity current_quantity = 0;
+            for (const Order& o : list) {
+                current_quantity += o.get_remaining_quantity();
+            }
+            std::cout << price << " | " << current_quantity << "\n";
+        }
+    }
+    std::cout << "==========================\n";
+}
 
+void OrderBook::print_main_menu() const {
+    std::cout << "1: Print Order Book\n";
+    std::cout << "2: Create Order\n";
+    std::cout << "3: Cancel Order\n";
+    std::cout << "4: Search Outstanding Order\n";
+    std::cout << "5: Search Order\n";
+    std::cout << "6: Search Trade\n";
+    std::cout << "7: Exit\n";
+}
+
+void OrderBook::print_order_id(const Order& order) const {
+    std::cout << "The order id is " << order.get_order_id() << ".\n";
+}
+
+void OrderBook::print_trade_id(const Trade& trade) const {
+    std::cout << "The trade id is " << trade.get_trade_id() << ".\n";
+}
+
+void OrderBook::run_cli() {
+    std::cout << "Welcome to C++ Order Book!\n";
+    while (true) {
+        print_main_menu();
+        int choice;
+        std::cout << "Choose option: ";
+        std::cin >> choice;
+        switch (choice) {
+            case 1: {
+                print_book();
+                break;
+            }
+            case 2: {
+                int temp;
+                bool exit = false;
+                OrderSide side;
+                OrderType type;
+                TimeInForce t_in_force;
+                Price p;
+                Quantity q;
+                temp = choose_side();
+                switch (temp) {
+                    case 1:
+                        side = OrderSide::Buy;
+                        break;
+                    case 2:
+                        side = OrderSide::Sell;
+                        break;
+                    case 3:
+                        exit = true;
+                }
+                if (exit) {
+                    break;
+                }
+                temp = choose_type();
+                switch (temp) {
+                    case 1:
+                        type = OrderType::Limit;
+                        break;
+                    case 2:
+                        exit = true;
+                }
+                if (exit) {
+                    break;
+                }
+                temp = choose_time_in_force();
+                switch (temp) {
+                    case 1:
+                        t_in_force = TimeInForce::GTC;
+                        break;
+                    case 2:
+                        exit = true;
+                }
+                if (exit) {
+                    break;
+                }
+                std::pair<Price, bool> price_result = choose_price();
+                if (price_result.second) {
+                    break;
+                }
+                p = price_result.first;
+                std::pair<Quantity, bool> quantity_result = choose_quantity();
+                if (quantity_result.second) {
+                    break;
+                }
+                q = quantity_result.first;
+                submit_order(side, type, t_in_force, p, q);
+                std::cout << "Order submitted.\n";
+                break;
+            }
+            case 3: {
+                cancel_order();
+                break;
+            }
+            case 4: {
+                search_order_book();
+                break;
+            }
+            case 5: {
+                search_order_in_order_journal();
+                break;
+            }
+            case 6: {
+                search_trade();
+                break;
+            }
+            case 7: {
+                std::cout << "Goodbye!\n";
+                return;
+            }
+            default: {
+                std::cout << "Invalid option.\n"; 
+            }
+        }
+    }
+}
+
+int OrderBook::choose_side() const {
+    int temp;
+    while (true) {
+        std::cout << "1. Buy\n";
+        std::cout << "2. Sell\n";
+        std::cout << "3. Cancel and Back to main menu\n";
+        std::cout << "Choose option: ";
+        std::cin >> temp;
+        switch (temp) {
+            case 1:
+                return temp;
+            case 2:
+                return temp;
+            case 3: 
+                return temp;
+            default:
+                std::cout << "Invalid Option.\n";
+        }
+    }
+}
+
+int OrderBook::choose_type() const {
+    int temp;
+    while (true) {
+        std::cout << "1. Limit\n";
+        std::cout << "2. Cancel and Back to main menu\n";
+        std::cout << "Choose option: ";
+        std::cin >> temp;
+        switch (temp) {
+            case 1:
+                return temp;
+            case 2:
+                return temp;
+            default:
+                std::cout << "Invalid Option.\n";
+        }
+    }
+}
+
+int OrderBook::choose_time_in_force() const {
+    int temp;
+    while (true) {
+        std::cout << "1. Good Till Canceled (GTC)\n";
+        std::cout << "2. Cancel and Back to main menu\n";
+        std::cout << "Choose option: ";
+        std::cin >> temp;
+        switch (temp) {
+            case 1:
+                return temp;
+            case 2:
+                return temp;
+            default:
+                std::cout << "Invalid Option.\n";
+        }
+    }
+}
+
+std::pair<Order::Price, bool> OrderBook::choose_price() const {
+    std::string input;
+    while (true) {
+        std::cout << "Type in order price (Type in 'e' to Cancel and Back to the main menu): ";
+        std::cin >> input;
+        if (input == "e") {
+            return {0, true};
+        }
+        try {
+            long long temp = std::stoll(input);
+            if (temp > std::numeric_limits<Price>::max() || temp < std::numeric_limits<Price>::min()) {
+                std::cout << "Invalid price. The number is out of range.\n";
+                continue;
+            }
+            return {static_cast<Price>(temp), false};
+        }
+        catch (const std::invalid_argument&) {
+            std::cout << "Invalid price. Please type in a number or 'e'.\n";
+            continue;
+        }
+        catch (const std::out_of_range&) {
+            std::cout << "Invalid price. The number is out of range.\n";
+            continue;
+        }
+    }
+}
+
+std::pair<Order::Quantity, bool> OrderBook::choose_quantity() const {
+    std::string input;
+    while (true) {
+        std::cout << "Type in quantity (Type in 'e' to Cancel and Back to the main menu): ";
+        std::cin >> input;
+        if (input == "e") {
+            return {0, true};
+        }
+        try {
+            unsigned long temp = std::stoul(input);
+            if (temp == 0) {
+                std::cout << "Invalid quantity. The number must be greater than 0.\n";
+                continue;
+            }
+            if (temp > std::numeric_limits<Quantity>::max()) {
+                std::cout << "Invalid quantity. The number is out of range.\n";
+                continue;
+            }
+            return {static_cast<Quantity>(temp), false};
+        }
+        catch (const std::invalid_argument&) {
+            std::cout << "Invalid quantity. Please type in a number or 'e'.\n";
+            continue;
+        }
+        catch (const std::out_of_range&) {
+            std::cout << "Invalid quantity. The number is out of range.\n";
+            continue;
+        }
+    }
+}
