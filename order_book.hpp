@@ -12,6 +12,7 @@ class OrderBook {
         using OrderId = Order::OrderId;
         using Quantity = Order::Quantity;
         using Time = Trade::Time;
+        using TradeId = Trade::TradeId;
 
     private:
         // Order ID counter
@@ -42,7 +43,7 @@ class OrderBook {
         void cancel_order(OrderId id);
         void match_order(Order order);
 
-        void submit_order(OrderSide side, OrderType type, TimeInForce t_in_force, Price p, Quantity q);
+        OrderId submit_order(OrderSide side, OrderType type, TimeInForce t_in_force, Price p, Quantity q);
         const Order search_order_book(OrderId id) const;
         const Order search_order_in_order_journal(OrderId id) const;
 
@@ -76,6 +77,8 @@ class OrderBook {
         void print_main_menu() const;
         void print_order_id(const Order& order) const;
         void print_trade_id(const Trade& trade) const;
+        void print_order(const OrderId& id) const;
+        void print_trade(const TradeId& id) const;
 
         // CLI
         void run_cli();
@@ -84,4 +87,10 @@ class OrderBook {
         int choose_time_in_force() const;
         std::pair<Price, bool> choose_price() const;
         std::pair<Quantity, bool> choose_quantity() const;
+
+        // To string helper functions
+        static const char* to_string(OrderSide s);
+        static const char* to_string(OrderType t);
+        static const char* to_string(TimeInForce t_in_force);
+        static const char* to_string(Status s);
 };

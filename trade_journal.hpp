@@ -21,6 +21,6 @@ class TradeJournal {
         TradeJournal() = default;
 
         TradeId create_trade(OrderId maker_id, OrderId taker_id, Price p, Quantity q);
-        Trade search_trade(TradeId id) const;
+        const Trade& search_trade(const TradeId& id) const;
         Time get_trade_completed_time(TradeId id) const;
 };

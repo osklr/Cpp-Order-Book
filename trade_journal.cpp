@@ -12,7 +12,7 @@ Trade::TradeId TradeJournal::create_trade(OrderId maker_id, OrderId taker_id, Pr
 }
 
 // Search information of a trade in trade journal with trade id
-Trade TradeJournal::search_trade(TradeId id) const {
+const Trade& TradeJournal::search_trade(const TradeId& id) const {
     std::unordered_map<TradeId, VectorIndex>::const_iterator current_iterator = trade_search_book.find(id);
     if (current_iterator != trade_search_book.end()) {
         return trade_journal[current_iterator->second];

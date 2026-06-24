@@ -136,9 +136,10 @@ void OrderBook::match_order(Order order) {
     }
 }
 
-void OrderBook::submit_order(OrderSide side, OrderType type, TimeInForce t_in_force, Price p, Quantity q) {
+Order::OrderId OrderBook::submit_order(OrderSide side, OrderType type, TimeInForce t_in_force, Price p, Quantity q) {
     Order current_order = create_order(side, type, t_in_force, p, q);
     match_order(current_order);
+    return current_order.get_order_id();
 }
 
 void OrderBook::set_order_status_from_order_book(OrderId id, Status s) {
@@ -426,6 +427,33 @@ void OrderBook::print_trade_id(const Trade& trade) const {
     std::cout << "The trade id is " << trade.get_trade_id() << ".\n";
 }
 
+void OrderBook::print_order(const OrderId& id) const {
+    const Order& order = search_order_in_order_journal(id);
+    std::cout << "Order information:\n";
+    std::cout << "Order ID: " << order.get_order_id() << "\n";
+    std::cout << "Order Side: " << to_string(order.get_order_side()) << "\n";
+    std::cout << "Order Type: " << to_string(order.get_order_type()) << "\n";
+    std::cout << "Time in force: " << to_string(order.get_time_in_force()) << "\n";
+    std::cout << "Price: " << order.get_price() << "\n";
+    std::cout << "Quantity: " << order.get_quantity() << "\n";
+    std::cout << "Remaining: " << order.get_remaining_quantity() << '\n';
+    std::cout << "Status: " << to_string(order.get_status()) << "\n";
+    std::cout << "Created time: " << order.get_created_time() << "\n";
+    std::cout << "Completed time: " << order.get_completed_time() << "\n";
+    std::cout << "Canceled time: " << order.get_canceled_time() << "\n"; 
+}
+
+void OrderBook::print_trade(const TradeId& id) const {
+    const Trade& trade = trade_journal.search_trade(id);
+    std::cout << "Trade information:\n";
+    std::cout << "Trade ID: " << trade.get_trade_id() << "\n";
+    std::cout << "Complete Time: " << trade.get_timestamp() << "\n";
+    std::cout << "Maker Order ID: " << trade.get_maker_order_id() << "\n";
+    std::cout << "Taker Order ID: " << trade.get_taker_order_id() << "\n";
+    std::cout << "Price: " << trade.get_price() << "\n";
+    std::cout << "Quantity: " << trade.get_quantity() << "\n";
+}
+
 void OrderBook::run_cli() {
     std::cout << "Welcome to C++ Order Book!\n";
     while (true) {
@@ -492,8 +520,9 @@ void OrderBook::run_cli() {
                     break;
                 }
                 q = quantity_result.first;
-                submit_order(side, type, t_in_force, p, q);
+                OrderId current_order_id = submit_order(side, type, t_in_force, p, q);
                 std::cout << "Order submitted.\n";
+                print_order(current_order_id);
                 break;
             }
             case 3: {
@@ -636,4 +665,73 @@ std::pair<Order::Quantity, bool> OrderBook::choose_quantity() const {
             continue;
         }
     }
+}
+
+const char* OrderBook::to_string(OrderSide s) {
+    switch(s) {
+        case OrderSide::Buy: {
+            return "Buy";
+        }
+        case OrderSide::Sell: {
+            return "Sell";
+        }
+    }
+    throw std::logic_error("Invalid order side.");
+}
+
+const char* OrderBook::to_string(OrderType t) {
+    switch(t) {
+        case OrderType::Limit: {
+            return "Limit";
+        }
+        case OrderType::Market: {
+            return "Market";
+        }
+        case OrderType::Stop: {
+            return "Stop";
+        }
+        case OrderType::StopLimit: {
+            return "Stop Limit";
+        }
+    }
+    throw std::logic_error("Invalid order type.");
+}
+
+const char* OrderBook::to_string(TimeInForce t_in_force) {
+    switch(t_in_force) {
+        case TimeInForce::GFD: {
+            return "Good For Day (GFD)";
+        }
+        case TimeInForce::GTC: {
+            return "Good Till Canceled (GTC)";
+        }
+        case TimeInForce::IOC: {
+            return "Immediate Or Cancel (IOC)";
+        }
+        case TimeInForce::FOK: {
+            return "Fill Or Kill (FOK)";
+        }
+    }
+    throw std::logic_error("Invalid time in force.");
+}
+
+const char* OrderBook::to_string(Status s) {
+    switch(s) {
+        case Status::New: {
+            return "New";
+        }
+        case Status::PartiallyFilled: {
+            return "Partially Filled";
+        }
+        case Status::Filled: {
+            return "Filled";
+        }
+        case Status::Canceled: {
+            return "Canceled";
+        }
+        case Status::Rejected: {
+            return "Rejected";
+        }
+    }
+    throw std::logic_error("Invalid status.");
 }
