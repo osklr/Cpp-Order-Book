@@ -526,19 +526,69 @@ void OrderBook::run_cli() {
                 break;
             }
             case 3: {
-                cancel_order();
+                OrderId order_id;
+                while (true) {
+                    std::cout << "Enter the order ID for cancellation: ";
+                    std::cin >> order_id;
+                    try {
+                        search_order_book(order_id);
+                        break;
+                    }
+                    catch (const std::out_of_range& e) {
+                        std::cout << e.what() << "\n";
+                    }
+                }
+                cancel_order(order_id);
+                std::cout << "The order is canceled.\n";
+                print_order(order_id);
                 break;
             }
             case 4: {
-                search_order_book();
+                OrderId order_id;
+                while (true) {
+                    std::cout << "Enter the order ID for searching: ";
+                    std::cin >> order_id;
+                    try {
+                        search_order_book(order_id);
+                        print_order(order_id);
+                        break;
+                    }
+                    catch (const std::out_of_range& e) {
+                        std::cout << e.what() << "\n";
+                    }
+                }
                 break;
             }
             case 5: {
-                search_order_in_order_journal();
+                OrderId order_id;
+                while (true) {
+                    std::cout << "Enter the order ID for searching: ";
+                    std::cin >> order_id;
+                    try {
+                        search_order_in_order_journal(order_id);
+                        print_order(order_id);
+                        break;
+                    }
+                    catch (const std::out_of_range& e) {
+                        std::cout << e.what() << "\n";
+                    }
+                }
                 break;
             }
             case 6: {
-                search_trade();
+                TradeId trade_id;
+                while (true) {
+                    std::cout << "Enter the trade ID for searching: ";
+                    std::cin >> trade_id;
+                    try {
+                        trade_journal.search_trade(trade_id);
+                        print_trade(trade_id);
+                        break;
+                    }
+                    catch (const std::out_of_range& e) {
+                        std::cout << e.what() << "\n";
+                    }
+                }
                 break;
             }
             case 7: {
