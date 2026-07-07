@@ -68,7 +68,7 @@ cd build
 
 ## Test 
 
-Install Google Test for testing:
+Install Google Test before testing:
 ```bash
 brew install googletest
 ```
