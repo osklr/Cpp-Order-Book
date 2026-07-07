@@ -1,7 +1,7 @@
 # Cpp-Order-Book
 
 ## Introduction
-A order book and matching engine written with C++20 with an CLI developed for learning purposes. Currently including functionalities of creating orders, resting orders on the bid/ask book, FIFO matching, order and trade journals, cancel outstanding orders and search orders and trades.
+An order book and matching engine written with C++20 with an CLI developed for learning purposes. Currently including functionalities of creating orders, resting orders on the bid/ask book, FIFO matching, order and trade journals, cancel outstanding orders and search orders and trades.
 
 ## Features
 
@@ -66,7 +66,7 @@ cd build
 ./order_book
 ```
 
-## Test 
+## Test
 
 Install Google Test before testing:
 ```bash
