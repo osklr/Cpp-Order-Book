@@ -242,7 +242,7 @@ void OrderBook::match_buy_order(Order& order) {
                 // Remove the maker order from the order book
                 current_list.pop_front();
                 // Remove the maker order from the order book search map
-                remove_record_from_order_book_search_map(current_order.get_order_id());
+                remove_record_from_order_book_search_map(maker_order_id);
                 // Remove the list at the trade price from the ask book if no order left at that price
                 remove_list_if_no_order(ask_book, current_iterator);
             }
@@ -323,7 +323,7 @@ void OrderBook::match_sell_order(Order& order) {
                 // Remove the maker order from the order book
                 current_list.pop_front();
                 // Remove the maker order from the order book search map
-                remove_record_from_order_book_search_map(current_order.get_order_id());
+                remove_record_from_order_book_search_map(maker_order_id);
                 // Remove the list at the trade price from the bid book if no order left at that price
                 remove_list_if_no_order(bid_book, current_iterator);
             }
