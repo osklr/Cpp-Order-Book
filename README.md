@@ -47,6 +47,7 @@ Searching functionality use a unordered map to match each order or trade ID for 
 
 - **CMake**: 3.15+
 - **C++20 Compiler**
+- **Google Test**: For automated testing.
 
 ## Build
 
@@ -63,6 +64,21 @@ cmake --build .
 ```bash
 cd build
 ./order_book
+```
+
+## Test 
+
+Install Google Test for testing:
+```bash
+brew install googletest
+```
+
+Testing:
+```bash
+cd build
+cmake ..
+cmake --build .
+ctest --output-on-failure
 ```
 
 ## Disclaimer
