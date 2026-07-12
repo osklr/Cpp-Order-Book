@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_executable(order_book main.cpp order_book.cpp trade_journal.cpp order_journal.cpp)
+add_executable(order_book main.cpp order_book.cpp trade_journal.cpp order_journal.cpp cli.cpp)
 
 enable_testing()
 

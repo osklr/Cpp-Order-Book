@@ -46,6 +46,7 @@ class OrderBook {
         OrderId submit_order(OrderSide side, OrderType type, TimeInForce t_in_force, Price p, Quantity q);
         const Order search_order_book(OrderId id) const;
         const Order search_order_in_order_journal(OrderId id) const;
+        const Trade& search_trade_in_trade_journal(TradeId id) const;
 
         // Set Functions
         void set_order_status_from_order_book(OrderId id, Status s);
@@ -72,25 +73,7 @@ class OrderBook {
         void finalize_filled_order(Order& order);
         void finalize_canceled_order(Order& order);
 
-        // Print Functions
-        void print_book() const;
-        void print_main_menu() const;
-        void print_order_id(const Order& order) const;
-        void print_trade_id(const Trade& trade) const;
-        void print_order(const OrderId& id) const;
-        void print_trade(const TradeId& id) const;
-
-        // CLI
-        void run_cli();
-        int choose_side() const;
-        int choose_type() const;
-        int choose_time_in_force() const;
-        std::pair<Price, bool> choose_price() const;
-        std::pair<Quantity, bool> choose_quantity() const;
-
-        // To string helper functions
-        static const char* to_string(OrderSide s);
-        static const char* to_string(OrderType t);
-        static const char* to_string(TimeInForce t_in_force);
-        static const char* to_string(Status s);
+        // Get Books
+        const std::map<Price, std::list<Order>, std::greater<Price>>& get_bid_book() const;
+        const std::map<Price, std::list<Order>>& get_ask_book() const;
 };

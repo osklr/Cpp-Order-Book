@@ -1,7 +1,7 @@
 # Cpp-Order-Book
 
 ## Introduction
-An order book and matching engine written with C++20 with an CLI developed for learning purposes. Currently including functionalities of creating orders, resting orders on the bid/ask book, FIFO matching, order and trade journals, cancel outstanding orders and search orders and trades.
+An order book and matching engine written with C++20 with a CLI developed for learning purposes. Currently including functionalities of creating orders, resting orders on the bid/ask book, FIFO matching, order and trade journals, cancel outstanding orders and search orders and trades.
 
 ## Features
 
@@ -23,9 +23,10 @@ An order book and matching engine written with C++20 with an CLI developed for l
 ### User-defined Classes
 
 - `Order`: Class for order.
-- `OrderBook`: Class for the whole system.
+- `OrderBook`: Class for the matching engine.
 - `OrderJournal`: Class for the order journal.
 - `TradeJournal`: Class for the trade journal.
+- `Cli`: Class for the CLI interface.
 
 ### Standard Classes
 
@@ -39,9 +40,9 @@ Searching functionality use a unordered map to match each order or trade ID for 
 ### Data flow
 
 1. Call submit_order (create_order + match_order) to create and match with the existing orders in books
-2. Record the order in the order_journal
-3. Waiting the order to match in the order books (Partial fills might occur).
-4. After the order is fully filled, record the trade in trade_journal.
+2. Record the order in the order_journal, then match the order.
+3. Resting the order on the books if a full fill did not occur.
+4. When a fill occurs towards the order, a trade is recorded in trade_journal.
 
 ## Requirements
 

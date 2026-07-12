@@ -1,7 +1,8 @@
-#include "order_book.hpp"
+#include "cli.hpp"
 
 int main() {
     OrderBook book;
-    book.run_cli();
+    Cli cli(book);
+    cli.run_cli();
     return 0;
 }
