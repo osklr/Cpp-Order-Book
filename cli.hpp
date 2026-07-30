@@ -4,15 +4,12 @@
 
 class Cli {
     private:
-        OrderBook& cli_book;
-    public:
-        using Price = OrderBook::Price;
-        using Quantity = OrderBook::Quantity;
-        using OrderId = OrderBook::OrderId;
-        using TradeId = OrderBook::TradeId;
+        using Price = Order::Price;
+        using Quantity = Order::Quantity;
+        using OrderId = Order::OrderId;
+        using TradeId = Trade::TradeId;
 
-        // Constructor
-        Cli(OrderBook& book) : cli_book(book) {};
+        OrderBook& cli_book;
 
         // Print Functions
         void print_book() const;
@@ -29,10 +26,16 @@ class Cli {
         static const char* to_string(Status s);
 
         // CLI
-        void run_cli();
         int choose_side() const;
         int choose_type() const;
         int choose_time_in_force() const;
         std::pair<Price, bool> choose_price() const;
         std::pair<Quantity, bool> choose_quantity() const;
+
+    public:
+        // Constructor
+        Cli(OrderBook& book) : cli_book(book) {};
+
+        // CLI
+        void run_cli();
 };

@@ -28,25 +28,13 @@ class OrderBook {
         OrderJournal order_journal;
         TradeJournal trade_journal;
 
-    public:
-        OrderBook() = default;
-        
-        // Get Functions
-        Price get_best_bid() const;
-        Price get_best_ask() const;
-        Price get_spread() const;
-        std::list<Order>& get_list_with_price_level(Price p, OrderSide s);
-
         // Main Functions
         Order create_order(OrderSide side, OrderType type, TimeInForce t_in_force, Price p, Quantity q);
         void place_order(Order& order);
-        void cancel_order(OrderId id);
         void match_order(Order order);
 
-        OrderId submit_order(OrderSide side, OrderType type, TimeInForce t_in_force, Price p, Quantity q);
-        const Order search_order_book(OrderId id) const;
-        const Order search_order_in_order_journal(OrderId id) const;
-        const Trade& search_trade_in_trade_journal(TradeId id) const;
+        // Get Functions
+        std::list<Order>& get_list_with_price_level(Price p, OrderSide s);
 
         // Set Functions
         void set_order_status_from_order_book(OrderId id, Status s);
@@ -72,6 +60,23 @@ class OrderBook {
         void handle_stop_order(Order& order);
         void finalize_filled_order(Order& order);
         void finalize_canceled_order(Order& order);
+
+    public:
+        OrderBook() = default;
+        
+        // Public Get Functions
+        Price get_best_bid() const;
+        Price get_best_ask() const;
+        Price get_spread() const;
+
+        // Public Main Functions
+        void cancel_order(OrderId id);
+        OrderId submit_order(OrderSide side, OrderType type, TimeInForce t_in_force, Price p, Quantity q);
+
+        // Public Search Functions
+        const Order search_order_book(OrderId id) const;
+        const Order search_order_in_order_journal(OrderId id) const;
+        const Trade& search_trade_in_trade_journal(TradeId id) const;
 
         // Get Books
         const std::map<Price, std::list<Order>, std::greater<Price>>& get_bid_book() const;

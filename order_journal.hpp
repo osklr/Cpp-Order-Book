@@ -4,14 +4,13 @@
 #include <unordered_map>
 
 class OrderJournal {
-    public:
+    private:
         using Price = Order::Price;
         using OrderId = Order::OrderId;
         using Quantity = Order::Quantity;
         using VectorIndex = size_t;
         using Time = Order::Time;
     
-    private:
         // Vector is used for storing orders, unordered_map is for searching in O(1)
         std::vector<Order> order_journal;
         std::unordered_map<OrderId, VectorIndex> order_journal_search_book;

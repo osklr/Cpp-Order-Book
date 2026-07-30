@@ -4,7 +4,7 @@
 #include <unordered_map>
 
 class TradeJournal {
-    public:
+    private:
         using TradeId = Trade::TradeId;
         using Time = Trade::Time;
         using OrderId = Trade::OrderId;
@@ -12,7 +12,6 @@ class TradeJournal {
         using Quantity = Trade::Quantity;
         using VectorIndex = size_t;
     
-    private:
         std::vector<Trade> trade_journal;
         std::unordered_map<TradeId, VectorIndex> trade_search_book;
         TradeId trade_id_counter{0};
