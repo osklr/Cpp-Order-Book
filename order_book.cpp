@@ -194,172 +194,190 @@ void OrderBook::remove_order_from_order_book(OrderId id) {
 }
 
 void OrderBook::match_buy_order(Order& order) {
-    // Buy side, check time in force
-    if (order.get_time_in_force() == TimeInForce::GTC) {
-        // Check if the ask book is empty. If yes, direct emplace a new order in the bid book. If not, check if the order could be filled.
-        if (ask_book.empty()) {
-            place_order(order);
-        }
-        else {
-            /* While the price of order is higher or equal to the best ask and the quantity of the order is greater than  
-            or equal to the quantity of the first order in the queue at the best ask, continue to fill the order. */
-            while (!ask_book.empty() && order.get_price() >= ask_book.begin()->first
-                && order.get_remaining_quantity() >= ask_book.begin()->second.begin()->get_remaining_quantity()) {
+    const TimeInForce tif = order.get_time_in_force();
 
-                auto current_iterator = ask_book.begin();
-                std::list<Order>& current_list = current_iterator->second;
-                Order& current_order = current_list.front(); // maker on the order book
-
-                Quantity trade_quantity = current_order.get_remaining_quantity();
-                Price current_price = current_iterator->first;
-                OrderId maker_order_id = current_order.get_order_id();
-
-                // Record the match event on trade journal
-                Trade::TradeId current_trade_id =
-                    trade_journal.create_trade(maker_order_id, order.get_order_id(), current_price, trade_quantity);
-                Time trade_time = trade_journal.get_trade_completed_time(current_trade_id);
-
-                // Apply fill to maker on the order book
-                apply_fill_to_maker_on_order_book(maker_order_id, trade_quantity, Status::Filled, trade_time);
-
-                // Decide taker status from remaining quantity after this fill, then apply fill to taker
-                Status taker_status = (order.get_remaining_quantity() - trade_quantity == 0) ? Status::Filled : Status::PartiallyFilled;
-                apply_fill_to_taker(order, trade_quantity, taker_status, trade_time);
-
-                // Sync history from the live orders to the order journal
-                sync_order_to_journal(current_order); // maker
-                sync_order_to_journal(order); // taker
-
-                // Remove filled maker from the live book
-                current_list.pop_front();
-                remove_record_from_order_book_search_map(maker_order_id);
-                remove_list_if_no_order(ask_book, current_iterator);
-            }
-            // Taker leftover is smaller than the front maker: finish the taker,
-            // partially fill the maker, leave the maker resting on the book.
-            if (!ask_book.empty()
-                && order.get_price() >= ask_book.begin()->first
-                && order.get_remaining_quantity() > 0
-                && order.get_remaining_quantity() < ask_book.begin()->second.begin()->get_remaining_quantity()) {
-
-                auto current_iterator = ask_book.begin();
-                Order& current_order = current_iterator->second.front(); // maker on the order book
-
-                // Trade size is all remaining taker quantity as the maker is larger
-                Quantity trade_quantity = order.get_remaining_quantity();
-                Price current_price = current_iterator->first;
-                OrderId maker_order_id = current_order.get_order_id();
-
-                // Record the match event in the trade journal
-                Trade::TradeId current_trade_id =
-                    trade_journal.create_trade(maker_order_id, order.get_order_id(), current_price, trade_quantity);
-                Time trade_time = trade_journal.get_trade_completed_time(current_trade_id);
-
-                // Apply partial fill to maker on the order book
-                apply_fill_to_maker_on_order_book(maker_order_id, trade_quantity, Status::PartiallyFilled, trade_time);
-
-                // Apply complete fill to taker
-                apply_fill_to_taker(order, trade_quantity, Status::Filled, trade_time);
-
-                // Sync history from live orders to the order journal
-                sync_order_to_journal(current_order); // maker which is still on the order book
-                sync_order_to_journal(order); // taker
-
-                // No pop to the maker as it still has remaining quantity
-                return;
-            }
-            if (order.get_remaining_quantity() > 0) {
-                place_order(order);
-            }
-        }
-    }
-    else {
+    // Only GTC and IOC supported for now
+    if (tif != TimeInForce::GTC && tif != TimeInForce::IOC) {
         return;
+    }
+
+    if (ask_book.empty()) {
+        if (tif == TimeInForce::GTC) {
+            place_order(order);           // GTC: rest on book
+        } else {
+            cancel_ioc_remainder(order);  // IOC: nowhere to match, therefore cancel
+        }
+        return;
+    }
+
+    /* While the price of order is higher or equal to the best ask and the quantity of the order is greater than  
+    or equal to the quantity of the first order in the queue at the best ask, continue to fill the order. */
+    while (!ask_book.empty() && order.get_price() >= ask_book.begin()->first
+        && order.get_remaining_quantity() >= ask_book.begin()->second.begin()->get_remaining_quantity()) {
+
+        auto current_iterator = ask_book.begin();
+        std::list<Order>& current_list = current_iterator->second;
+        Order& current_order = current_list.front(); // maker on the order book
+
+        Quantity trade_quantity = current_order.get_remaining_quantity();
+        Price current_price = current_iterator->first;
+        OrderId maker_order_id = current_order.get_order_id();
+
+        // Record the match event on trade journal
+        Trade::TradeId current_trade_id =
+            trade_journal.create_trade(maker_order_id, order.get_order_id(), current_price, trade_quantity);
+        Time trade_time = trade_journal.get_trade_completed_time(current_trade_id);
+
+        // Apply fill to maker on the order book
+        apply_fill_to_maker_on_order_book(maker_order_id, trade_quantity, Status::Filled, trade_time);
+
+        // Decide taker status from remaining quantity after this fill, then apply fill to taker
+        Status taker_status = (order.get_remaining_quantity() - trade_quantity == 0) ? Status::Filled : Status::PartiallyFilled;
+        apply_fill_to_taker(order, trade_quantity, taker_status, trade_time);
+
+        // Sync history from the live orders to the order journal
+        sync_order_to_journal(current_order); // maker
+        sync_order_to_journal(order); // taker
+
+        // Remove filled maker from the live book
+        current_list.pop_front();
+        remove_record_from_order_book_search_map(maker_order_id);
+        remove_list_if_no_order(ask_book, current_iterator);
+    }
+    // Taker leftover is smaller than the front maker: finish the taker,
+    // partially fill the maker, leave the maker resting on the book.
+    if (!ask_book.empty()
+        && order.get_price() >= ask_book.begin()->first
+        && order.get_remaining_quantity() > 0
+        && order.get_remaining_quantity() < ask_book.begin()->second.begin()->get_remaining_quantity()) {
+
+        auto current_iterator = ask_book.begin();
+        Order& current_order = current_iterator->second.front(); // maker on the order book
+
+        // Trade size is all remaining taker quantity as the maker is larger
+        Quantity trade_quantity = order.get_remaining_quantity();
+        Price current_price = current_iterator->first;
+        OrderId maker_order_id = current_order.get_order_id();
+
+        // Record the match event in the trade journal
+        Trade::TradeId current_trade_id =
+            trade_journal.create_trade(maker_order_id, order.get_order_id(), current_price, trade_quantity);
+        Time trade_time = trade_journal.get_trade_completed_time(current_trade_id);
+
+        // Apply partial fill to maker on the order book
+        apply_fill_to_maker_on_order_book(maker_order_id, trade_quantity, Status::PartiallyFilled, trade_time);
+
+        // Apply complete fill to taker
+        apply_fill_to_taker(order, trade_quantity, Status::Filled, trade_time);
+
+        // Sync history from live orders to the order journal
+        sync_order_to_journal(current_order); // maker which is still on the order book
+        sync_order_to_journal(order); // taker
+
+        // No pop to the maker as it still has remaining quantity
+        return;
+    }
+    // Leftover handling differs by Time in force
+    if (order.get_remaining_quantity() > 0) {
+        if (tif == TimeInForce::GTC) {
+            place_order(order);
+        } else {
+            // IOC: do not rest and cancel unfilled quantity
+            cancel_ioc_remainder(order);
+        }
     }
 }
 
 void OrderBook::match_sell_order(Order& order) {
-    // Sell side, check time in force
-    if (order.get_time_in_force() == TimeInForce::GTC) {
-        // Check if the bid book is empty. If yes, direct emplace a new order in the ask book. If not, check if the order could be filled.
-        if (bid_book.empty()) {
-            place_order(order);
-        }
-        else {
-            /* While the price of order is lower or equal to the best bid and the quantity of the order is greater than
-            or equal to the quantity of the first order in the queue at the best bid, continue to fill the order. */
-            while (!bid_book.empty() && order.get_price() <= bid_book.begin()->first
-                && order.get_remaining_quantity() >= bid_book.begin()->second.begin()->get_remaining_quantity()) {
+    const TimeInForce tif = order.get_time_in_force();
 
-                auto current_iterator = bid_book.begin();
-                std::list<Order>& current_list = current_iterator->second;
-                Order& current_order = current_list.front(); // maker on the order book
-
-                Quantity trade_quantity = current_order.get_remaining_quantity();
-                Price current_price = current_iterator->first;
-                OrderId maker_order_id = current_order.get_order_id();
-
-                // Record the match event on trade journal
-                Trade::TradeId current_trade_id =
-                    trade_journal.create_trade(maker_order_id, order.get_order_id(), current_price, trade_quantity);
-                Time trade_time = trade_journal.get_trade_completed_time(current_trade_id);
-
-                // Apply fill to maker on the order book
-                apply_fill_to_maker_on_order_book(maker_order_id, trade_quantity, Status::Filled, trade_time);
-
-                // Decide taker status from remaining quantity after this fill, then apply fill to taker
-                Status taker_status = (order.get_remaining_quantity() - trade_quantity == 0) ? Status::Filled : Status::PartiallyFilled;
-                apply_fill_to_taker(order, trade_quantity, taker_status, trade_time);
-
-                // Sync history from the live orders to the order journal
-                sync_order_to_journal(current_order); // maker
-                sync_order_to_journal(order); // taker
-
-                // Remove filled maker from the live book
-                current_list.pop_front();
-                remove_record_from_order_book_search_map(maker_order_id);
-                remove_list_if_no_order(bid_book, current_iterator);
-            }
-            // If taker leftover is smaller than the front maker, then finish the taker,
-            // partially fill the maker, leave the maker resting on the book.
-            if (!bid_book.empty()
-                && order.get_price() <= bid_book.begin()->first
-                && order.get_remaining_quantity() > 0
-                && order.get_remaining_quantity() < bid_book.begin()->second.begin()->get_remaining_quantity()) {
-
-                auto current_iterator = bid_book.begin();
-                Order& current_order = current_iterator->second.front(); // maker on the order book
-
-                // Trade size is all remaining taker quantity as the maker is larger
-                Quantity trade_quantity = order.get_remaining_quantity();
-                Price current_price = current_iterator->first;
-                OrderId maker_order_id = current_order.get_order_id();
-
-                // Record the match event in the trade journal
-                Trade::TradeId current_trade_id =
-                    trade_journal.create_trade(maker_order_id, order.get_order_id(), current_price, trade_quantity);
-                Time trade_time = trade_journal.get_trade_completed_time(current_trade_id);
-
-                // Apply partial fill to maker on the order book
-                apply_fill_to_maker_on_order_book(maker_order_id, trade_quantity, Status::PartiallyFilled, trade_time);
-
-                // Apply complete fill to taker
-                apply_fill_to_taker(order, trade_quantity, Status::Filled, trade_time);
-
-                // Sync history from live orders to the order journal
-                sync_order_to_journal(current_order); // maker which is still on the order book
-                sync_order_to_journal(order); // taker
-
-                // Do not pop the maker as it still has remaining quantity
-                return;
-            }
-            if (order.get_remaining_quantity() > 0) {
-                place_order(order);
-            }
-        }
-    }
-    else {
+    // Only GTC and IOC supported for now
+    if (tif != TimeInForce::GTC && tif != TimeInForce::IOC) {
         return;
+    }
+
+    if (bid_book.empty()) {
+        if (tif == TimeInForce::GTC) {
+            place_order(order);           // GTC: rest on book
+        } else {
+            cancel_ioc_remainder(order);  // IOC: nowhere to match, therefore cancel
+        }
+        return;
+    }
+    
+    /* While the price of order is lower or equal to the best bid and the quantity of the order is greater than
+    or equal to the quantity of the first order in the queue at the best bid, continue to fill the order. */
+    while (!bid_book.empty() && order.get_price() <= bid_book.begin()->first
+        && order.get_remaining_quantity() >= bid_book.begin()->second.begin()->get_remaining_quantity()) {
+
+        auto current_iterator = bid_book.begin();
+        std::list<Order>& current_list = current_iterator->second;
+        Order& current_order = current_list.front(); // maker on the order book
+
+        Quantity trade_quantity = current_order.get_remaining_quantity();
+        Price current_price = current_iterator->first;
+        OrderId maker_order_id = current_order.get_order_id();
+
+        // Record the match event on trade journal
+        Trade::TradeId current_trade_id =
+            trade_journal.create_trade(maker_order_id, order.get_order_id(), current_price, trade_quantity);
+        Time trade_time = trade_journal.get_trade_completed_time(current_trade_id);
+
+        // Apply fill to maker on the order book
+        apply_fill_to_maker_on_order_book(maker_order_id, trade_quantity, Status::Filled, trade_time);
+
+        // Decide taker status from remaining quantity after this fill, then apply fill to taker
+        Status taker_status = (order.get_remaining_quantity() - trade_quantity == 0) ? Status::Filled : Status::PartiallyFilled;
+        apply_fill_to_taker(order, trade_quantity, taker_status, trade_time);
+
+        // Sync history from the live orders to the order journal
+        sync_order_to_journal(current_order); // maker
+        sync_order_to_journal(order); // taker
+
+        // Remove filled maker from the live book
+        current_list.pop_front();
+        remove_record_from_order_book_search_map(maker_order_id);
+        remove_list_if_no_order(bid_book, current_iterator);
+    }
+    // If taker leftover is smaller than the front maker, then finish the taker,
+    // partially fill the maker, leave the maker resting on the book.
+    if (!bid_book.empty()
+        && order.get_price() <= bid_book.begin()->first
+        && order.get_remaining_quantity() > 0
+        && order.get_remaining_quantity() < bid_book.begin()->second.begin()->get_remaining_quantity()) {
+
+        auto current_iterator = bid_book.begin();
+        Order& current_order = current_iterator->second.front(); // maker on the order book
+
+        // Trade size is all remaining taker quantity as the maker is larger
+        Quantity trade_quantity = order.get_remaining_quantity();
+        Price current_price = current_iterator->first;
+        OrderId maker_order_id = current_order.get_order_id();
+
+        // Record the match event in the trade journal
+        Trade::TradeId current_trade_id =
+            trade_journal.create_trade(maker_order_id, order.get_order_id(), current_price, trade_quantity);
+        Time trade_time = trade_journal.get_trade_completed_time(current_trade_id);
+
+        // Apply partial fill to maker on the order book
+        apply_fill_to_maker_on_order_book(maker_order_id, trade_quantity, Status::PartiallyFilled, trade_time);
+
+        // Apply complete fill to taker
+        apply_fill_to_taker(order, trade_quantity, Status::Filled, trade_time);
+
+        // Sync history from live orders to the order journal
+        sync_order_to_journal(current_order); // maker which is still on the order book
+        sync_order_to_journal(order); // taker
+
+        // Do not pop the maker as it still has remaining quantity
+        return;
+    }
+    if (order.get_remaining_quantity() > 0) {
+        if (tif == TimeInForce::GTC) {
+            place_order(order);
+        } else {
+            cancel_ioc_remainder(order);
+        }
     }
 }
 
@@ -405,4 +423,16 @@ void OrderBook::sync_order_to_journal(const Order& live_order) {
     order_journal.set_remaining_quantity_in_order_journal(id, live_order.get_remaining_quantity());
     order_journal.set_completed_time_in_order_journal(id, live_order.get_completed_time());
     order_journal.set_canceled_time_in_order_journal(id, live_order.get_canceled_time());
+}
+
+void OrderBook::cancel_ioc_remainder(Order& order) {
+    if (order.get_remaining_quantity() == 0) {
+        return; // fully filled, therefore nothing to cancel
+    }
+    order.set_status(Status::Canceled);
+    Order::Time current_time = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    order.set_canceled_time(current_time);
+    // Live directly sync to journal as order was never rested on the order book
+    sync_order_to_journal(order);
 }

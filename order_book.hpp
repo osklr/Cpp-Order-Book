@@ -65,6 +65,8 @@ class OrderBook {
         void apply_fill_to_maker_on_order_book(OrderId maker_id, Quantity trade_qty, Status new_status, Time t);
         void apply_fill_to_taker(Order& taker, Quantity trade_qty, Status new_status, Time t);
 
+        void cancel_ioc_remainder(Order& order);
+
     public:
         OrderBook() = default;
         

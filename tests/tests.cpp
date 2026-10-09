@@ -176,3 +176,49 @@ TEST(matching, cross_best_ask_but_fill_with_best_ask_first) {
     EXPECT_THROW(book.search_order_book(sell_id_101), std::out_of_range);
     EXPECT_THROW(book.search_order_book(buy_id), std::out_of_range);
 }
+
+// --- IOC (Immediate Or Cancel) ---
+
+// IOC on empty book: nowhere to match, therefore cancel full size and never rest
+TEST(matching, ioc_buy_on_empty_book_cancels) {
+    OrderBook book;
+    const auto id = book.submit_order(OrderSide::Buy, OrderType::Limit, TimeInForce::IOC, 100, 10);
+
+    const Order o = book.search_order_in_order_journal(id);
+    EXPECT_EQ(o.get_status(), Status::Canceled);
+    EXPECT_EQ(o.get_remaining_quantity(), 10u);
+    
+    // Not on the live book
+    EXPECT_THROW(book.search_order_book(id), std::out_of_range);
+}
+
+// IOC partial fill: take available size, cancel leftover and do not rest
+TEST(matching, ioc_buy_partial_fill_cancels_remainder) {
+    OrderBook book;
+
+    const auto sell_id = book.submit_order(OrderSide::Sell, OrderType::Limit, TimeInForce::GTC, 100, 4);
+
+    const auto buy_id = book.submit_order(OrderSide::Buy, OrderType::Limit, TimeInForce::IOC, 100, 10);
+
+    const Order& sell = book.search_order_in_order_journal(sell_id);
+    const Order& buy = book.search_order_in_order_journal(buy_id);
+
+    EXPECT_EQ(sell.get_status(), Status::Filled);
+    EXPECT_EQ(sell.get_remaining_quantity(), 0u);
+
+    EXPECT_EQ(buy.get_status(), Status::Canceled);
+    EXPECT_EQ(buy.get_remaining_quantity(), 6u);
+    EXPECT_THROW(book.search_order_book(buy_id), std::out_of_range);
+}
+
+// IOC full fill has the same end state as a full GTC fill
+TEST(matching, ioc_buy_full_fill) {
+    OrderBook book;
+    book.submit_order(OrderSide::Sell, OrderType::Limit, TimeInForce::GTC, 100, 10);
+    const auto buy_id = book.submit_order(OrderSide::Buy, OrderType::Limit, TimeInForce::IOC, 100, 10);
+
+    const Order& buy = book.search_order_in_order_journal(buy_id);
+    EXPECT_EQ(buy.get_status(), Status::Filled);
+    EXPECT_EQ(buy.get_remaining_quantity(), 0u);
+    EXPECT_THROW(book.search_order_book(buy_id), std::out_of_range);
+}

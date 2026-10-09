@@ -206,6 +206,9 @@ void Cli::run_cli() {
                         t_in_force = TimeInForce::GTC;
                         break;
                     case 2:
+                        t_in_force = TimeInForce::IOC;
+                        break;
+                    case 3:
                         exit = true;
                 }
                 if (exit) {
@@ -346,13 +349,14 @@ int Cli::choose_time_in_force() const {
     int temp;
     while (true) {
         std::cout << "1. Good Till Canceled (GTC)\n";
-        std::cout << "2. Cancel and Back to main menu\n";
+        std::cout << "2. Immediate Or Cancel (IOC)\n";
+        std::cout << "3. Cancel and Back to main menu\n";
         std::cout << "Choose option: ";
         std::cin >> temp;
         switch (temp) {
-            case 1:
-                return temp;
-            case 2:
+            case 1: // GTC
+            case 2: // IOC
+            case 3: // back to main menu
                 return temp;
             default:
                 std::cout << "Invalid Option.\n";
