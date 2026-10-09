@@ -7,10 +7,10 @@ An order book and matching engine written with C++20 with a CLI developed for le
 
 ### Implemented
 - **Bid and ask books**: order books with O(log n) insertion and placing time complexity with FIFO mechanism.
-- **Order Search in O(1)**: functionalities including order search, trade search, order modification and order cancellation are running in O(1) with std::unordered_map.
+- **Order Search in O(1)**: functionalities including order search, trade search and order cancellation are running in O(1) with std::unordered_map.
 - **GTC limit order**: Currently, the book is limited to limit order with GTC time in force with both buy and sell sides.
 - **Partial and full fills**: The book records remaining quantity for partial filled orders.
-- **Journals**: Record all orders and trades.
+- **Journals**: Order journal (history) and trade journal (fills); live book is the source of truth for resting state.
 - **CLI**: Terminal CLI is implemented for user action.
 
 ### In progress
@@ -30,19 +30,23 @@ An order book and matching engine written with C++20 with a CLI developed for le
 
 ### Standard Classes
 
-Books classes uses a ordered map in order to find the best bid or ask price at a O(1) time complexity, and for a FIFO inserting in O(log n) time complexity in searching price in the map. A list in each price level is used when placing the order into the book.
+Book classes use an ordered map in order to find the best bid or ask price at an O(1) time complexity, and for a FIFO inserting in O(log n) time complexity in searching price in the map. A list in each price level is used when placing the order into the book.
 
 - `std::map<Price, std::list<Order>, std::greater<Price>>`: Class for the bid book, ordering the highest price at the beginning.
 - `std::map<Price, std::list<Order>>`: Class for the ask book.
 
-Searching functionality use a unordered map to match each order or trade ID for searching them in O(1).
+Searching functionality uses an unordered map to match each order or trade ID for searching them in O(1).
 
 ### Data flow
 
-1. Call submit_order (create_order + match_order) to create and match with the existing orders in books
-2. Record the order in the order_journal, then match the order.
-3. Resting the order on the books if a full fill did not occur.
-4. When a fill occurs towards the order, a trade is recorded in trade_journal.
+1. `submit_order` creates the order, records it in the order journal, then matches.
+2. On a fill: update **live** maker/taker first, then `sync_order_to_journal`, then remove filled makers from the book.
+3. Unfilled leftover rests on the bid/ask book.
+4. Each fill also creates a trade in the trade journal.
+
+Remark: Cancel updates the live order, syncs the journal, then removes it from the book.
+
+**Live book** = current resting orders. **Order journal** = history snapshots. **Trade journal** = match events.
 
 ## Requirements
 

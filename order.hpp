@@ -89,5 +89,6 @@ class Order {
         void set_status(Status s) { status = s; }
         void set_completed_time(Time t) { completed_time = t; }
         void set_canceled_time(Time t) { canceled_time = t; }
+        void set_remaining_quantity(Quantity q) { remaining_quantity = q; }
         void subtract_remaining_quantity(Quantity q) { remaining_quantity -= q; }
 };

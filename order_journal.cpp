@@ -40,6 +40,14 @@ void OrderJournal::set_status_in_order_journal(OrderId id, Status s) {
     order_journal[current_iterator->second].set_status(s);
 }
 
+void OrderJournal::set_remaining_quantity_in_order_journal(OrderId id, Quantity q) {
+    std::unordered_map<OrderId, VectorIndex>::const_iterator current_iterator = order_journal_search_book.find(id);
+    if (current_iterator == order_journal_search_book.end()) {
+        throw std::out_of_range("The order record is not found.");
+    }
+    order_journal[current_iterator->second].set_remaining_quantity(q);
+}
+
 void OrderJournal::subtract_remaining_quantity_in_order_journal(OrderId id, Quantity q) {
     std::unordered_map<OrderId, VectorIndex>::const_iterator current_iterator = order_journal_search_book.find(id);
     if (current_iterator == order_journal_search_book.end()) {

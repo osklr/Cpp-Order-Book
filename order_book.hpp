@@ -61,6 +61,10 @@ class OrderBook {
         void finalize_filled_order(Order& order);
         void finalize_canceled_order(Order& order);
 
+        void sync_order_to_journal(const Order& live_order);
+        void apply_fill_to_maker_on_order_book(OrderId maker_id, Quantity trade_qty, Status new_status, Time t);
+        void apply_fill_to_taker(Order& taker, Quantity trade_qty, Status new_status, Time t);
+
     public:
         OrderBook() = default;
         
