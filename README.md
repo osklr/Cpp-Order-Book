@@ -1,7 +1,7 @@
 # Cpp-Order-Book
 
 ## Introduction
-An order book and matching engine written with C++20 with a CLI developed for learning purposes. Currently including functionalities of creating orders, resting orders on the bid/ask book, FIFO matching, GTC and IOC time-in-force, order and trade journals, cancel outstanding orders and search orders and trades.
+An order book and matching engine written with C++20 with a CLI developed for learning purposes. Currently including functionalities of creating orders, resting orders on the bid/ask book, FIFO matching, GTC, IOC, and FOK time-in-force, order and trade journals, cancel outstanding orders and search orders and trades.
 
 ## Features
 
@@ -10,13 +10,14 @@ An order book and matching engine written with C++20 with a CLI developed for le
 - **Order Search in O(1)**: functionalities including order search, trade search and order cancellation are running in O(1) with std::unordered_map.
 - **GTC limit order**: Limit orders with GTC rest any unfilled quantity on the book.
 - **IOC limit orders**: match immediately; any unfilled quantity is canceled and never rests on the book.
+- **FOK limit orders**: fill the entire size immediately or cancel the whole order (no partial fills, no resting).
 - **Partial and full fills**: The book records remaining quantity for partial filled orders.
 - **Journals**: Order journal (history) and trade journal (fills); live book is the source of truth for resting state.
 - **CLI**: Terminal CLI is implemented for user action.
 
 ### In progress
 - Market, Stop, Stop-Limit order types.
-- GFD and FOK time in force settings.
+- GFD time in force setting.
 - Automatic trade listing.
 
 ## Current Architecture

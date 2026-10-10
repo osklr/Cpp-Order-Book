@@ -17,7 +17,7 @@ enum class TimeInForce {
     GFD, // Good For Day (Deferred)
     GTC, // Good Till Canceled 
     IOC, // Immediate Or Cancel
-    FOK  // Fill Or Kill (Deferred)
+    FOK  // Fill Or Kill
 };
 
 enum class Status : uint8_t {

@@ -65,7 +65,11 @@ class OrderBook {
         void apply_fill_to_maker_on_order_book(OrderId maker_id, Quantity trade_qty, Status new_status, Time t);
         void apply_fill_to_taker(Order& taker, Quantity trade_qty, Status new_status, Time t);
 
-        void cancel_ioc_remainder(Order& order);
+        void cancel_unrested_order(Order& order);
+
+        // Check if resting liquidity can fill this order completely
+        bool can_fully_fill_buy(const Order& order) const;
+        bool can_fully_fill_sell(const Order& order) const;
 
     public:
         OrderBook() = default;

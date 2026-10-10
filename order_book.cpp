@@ -196,8 +196,8 @@ void OrderBook::remove_order_from_order_book(OrderId id) {
 void OrderBook::match_buy_order(Order& order) {
     const TimeInForce tif = order.get_time_in_force();
 
-    // Only GTC and IOC supported for now
-    if (tif != TimeInForce::GTC && tif != TimeInForce::IOC) {
+    // GTC, IOC, and FOK supported for matching
+    if (tif != TimeInForce::GTC && tif != TimeInForce::IOC && tif != TimeInForce::FOK) {
         return;
     }
 
@@ -205,8 +205,14 @@ void OrderBook::match_buy_order(Order& order) {
         if (tif == TimeInForce::GTC) {
             place_order(order);           // GTC: rest on book
         } else {
-            cancel_ioc_remainder(order);  // IOC: nowhere to match, therefore cancel
+            cancel_unrested_order(order);  // IOC/FOK: nowhere to match, then cancel
         }
+        return;
+    }
+
+    // FOK: match only if full size is available; otherwise kill with no trades
+    if (tif == TimeInForce::FOK && !can_fully_fill_buy(order)) {
+        cancel_unrested_order(order);
         return;
     }
 
@@ -282,8 +288,8 @@ void OrderBook::match_buy_order(Order& order) {
         if (tif == TimeInForce::GTC) {
             place_order(order);
         } else {
-            // IOC: do not rest and cancel unfilled quantity
-            cancel_ioc_remainder(order);
+            // IOC leftover or FOK kill: do not rest
+            cancel_unrested_order(order);
         }
     }
 }
@@ -291,8 +297,8 @@ void OrderBook::match_buy_order(Order& order) {
 void OrderBook::match_sell_order(Order& order) {
     const TimeInForce tif = order.get_time_in_force();
 
-    // Only GTC and IOC supported for now
-    if (tif != TimeInForce::GTC && tif != TimeInForce::IOC) {
+    // GTC, IOC, and FOK supported for matching
+    if (tif != TimeInForce::GTC && tif != TimeInForce::IOC && tif != TimeInForce::FOK) {
         return;
     }
 
@@ -300,8 +306,14 @@ void OrderBook::match_sell_order(Order& order) {
         if (tif == TimeInForce::GTC) {
             place_order(order);           // GTC: rest on book
         } else {
-            cancel_ioc_remainder(order);  // IOC: nowhere to match, therefore cancel
+            cancel_unrested_order(order);  // IOC/FOK: nowhere to match, then cancel
         }
+        return;
+    }
+
+    // FOK: match only if full size is available, otherwise kill with no trades
+    if (tif == TimeInForce::FOK && !can_fully_fill_sell(order)) {
+        cancel_unrested_order(order);
         return;
     }
     
@@ -376,7 +388,7 @@ void OrderBook::match_sell_order(Order& order) {
         if (tif == TimeInForce::GTC) {
             place_order(order);
         } else {
-            cancel_ioc_remainder(order);
+            cancel_unrested_order(order);
         }
     }
 }
@@ -425,7 +437,7 @@ void OrderBook::sync_order_to_journal(const Order& live_order) {
     order_journal.set_canceled_time_in_order_journal(id, live_order.get_canceled_time());
 }
 
-void OrderBook::cancel_ioc_remainder(Order& order) {
+void OrderBook::cancel_unrested_order(Order& order) {
     if (order.get_remaining_quantity() == 0) {
         return; // fully filled, therefore nothing to cancel
     }
@@ -435,4 +447,44 @@ void OrderBook::cancel_ioc_remainder(Order& order) {
     order.set_canceled_time(current_time);
     // Live directly sync to journal as order was never rested on the order book
     sync_order_to_journal(order);
+}
+
+// check the sum of ask size at prices the buy can fill in order to validate if a fully fill is possible. Read-only.
+bool OrderBook::can_fully_fill_buy(const Order& order) const {
+    Quantity needed = order.get_remaining_quantity();
+
+    for (auto level = ask_book.begin(); level != ask_book.end(); ++level) {
+        // Cannot take asks above the buy's limit
+        if (level->first > order.get_price()) {
+            break;
+        }
+        for (const Order& maker : level->second) {
+            Quantity available = maker.get_remaining_quantity();
+            if (available >= needed) {
+                return true; // enough liquidity found
+            }
+            needed -= available;
+        }
+    }
+    return needed == 0;
+}
+
+// check the sum of bid size at prices the sell can fill in order to validate if a fully fill is possible. Read-only.
+bool OrderBook::can_fully_fill_sell(const Order& order) const {
+    Quantity needed = order.get_remaining_quantity();
+
+    for (auto level = bid_book.begin(); level != bid_book.end(); ++level) {
+        // Cannot take bids below the sell's limit
+        if (level->first < order.get_price()) {
+            break;
+        }
+        for (const Order& maker : level->second) {
+            Quantity available = maker.get_remaining_quantity();
+            if (available >= needed) {
+                return true;
+            }
+            needed -= available;
+        }
+    }
+    return needed == 0;
 }
